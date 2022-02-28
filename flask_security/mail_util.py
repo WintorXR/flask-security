@@ -1,4 +1,7 @@
 """
+    Mail Util class for working with flask_mailman, which is a more modern mail implementation.
+
+    Originally from the following module:
     flask_security.mail_util
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -10,15 +13,14 @@
     While this default implementation uses FlaskMail - we want to make sure that
     FlaskMail isn't REQUIRED (if this implementation isn't used).
 """
-import typing as t
+from typing import Any, TYPE_CHECKING
 
-import email_validator
-from flask import current_app
+from email_validator import validate_email
+from flask import current_app  # noqa
+from flask_mailman import EmailMessage
 
-from .utils import config_value
-
-if t.TYPE_CHECKING:  # pragma: no cover
-    import flask
+if TYPE_CHECKING:  # pragma: no cover
+    from flask import Flask
     from .datastore import User
 
 
@@ -32,31 +34,23 @@ class MailUtil:
     To provide your own implementation, pass in the class as ``mail_util_cls``
     at init time.  Your class will be instantiated once as part of app initialization.
 
-    .. versionadded:: 4.0.0
     """
 
-    def __init__(self, app: "flask.Flask"):
+    validator_args = {}
+
+    def __init__(self, app: "Flask"):
         """Instantiate class.
 
-        :param app: The Flask application being initialized.
+        param app: The Flask application being initialized
         """
-        pass
+        self.app = app
 
-    def send_mail(
-        self,
-        template: str,
-        subject: str,
-        recipient: str,
-        sender: t.Union[str, tuple],
-        body: str,
-        html: str,
-        user: "User",
-        **kwargs: t.Any
-    ) -> None:
+    def send_mail(self, template: str, subject: str, recipient: str, sender: str | tuple,  # noqa
+                  body: str, html: str, user: "User", **kwargs: Any) -> None:  # noqa
         """Send an email via the Flask-Mail extension.
 
-        :param template: the Template name. The message has already been rendered
-            however this might be useful to differentiate why the email is being sent.
+        param template: the Template name. The message has already been rendered
+            however this might be useful to differentiate why the email is being sent
         :param subject: Email subject
         :param recipient: Email recipient
         :param sender: who to send email as (see :py:data:`SECURITY_EMAIL_SENDER`)
@@ -64,15 +58,16 @@ class MailUtil:
         :param html: the rendered body (html)
         :param user: the user model
         """
-
-        from flask_mail import Message
-
-        msg = Message(subject, sender=sender, recipients=[recipient])
-        msg.body = body
-        msg.html = html
-
-        mail = current_app.extensions.get("mail")
-        mail.send(msg)  # type: ignore
+        # if html:
+        #     headers = {'Content-Type': 'text/html; charset=UTF-8'}
+        #     msg = EmailMessage(subject, body=html, from_email=sender, to=[recipient], headers=headers)
+        if body:  # pragma: no cover
+            msg = EmailMessage(subject, body=body, from_email=sender, to=[recipient])
+        else:  # pragma: no cover
+            self.app.logger.warning(f'mail on {subject} missing body')
+            return
+        self.app.logger.warning(f'send mail on {subject} to {recipient}')  # pragma: no cover
+        msg.send()  # pragma: no cover
 
     def normalize(self, email: str) -> str:
         """
@@ -83,9 +78,7 @@ class MailUtil:
 
         Will throw email_validator.EmailNotValidError if email isn't even valid.
         """
-        validator_args = config_value("EMAIL_VALIDATOR_ARGS") or {}
-        valid = email_validator.validate_email(email, **validator_args)
-        return valid.email
+        return validate_email(email, **self.validator_args).email  # pragma: no cover
 
     def validate(self, email: str) -> str:
         """
@@ -94,7 +87,4 @@ class MailUtil:
 
         ValueError is thrown if not valid.
         """
-
-        validator_args = config_value("EMAIL_VALIDATOR_ARGS") or {}
-        valid = email_validator.validate_email(email, **validator_args)
-        return valid.email
+        return validate_email(email, **self.validator_args).email  # pragma: no cover
