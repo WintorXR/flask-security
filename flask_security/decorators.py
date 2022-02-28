@@ -76,7 +76,7 @@ def default_unauthn_handler(mechanisms, headers=None):
 
     if config_value("BACKWARDS_COMPAT_UNAUTHN"):
         return _get_unauthenticated_response(headers=headers)
-    if _security._want_json(request):
+    if _security._want_json(request) or request.args.get('auth_token'):
         payload = json_error_response(errors=msg)
         return _security._render_json(payload, 401, headers, None)
 
