@@ -453,7 +453,7 @@ class LoginForm(Form, NextFormMixin):
         self.user = find_user(self.email.data)
 
         if self.user is None:
-            self.email.errors.append(get_message("USER_DOES_NOT_EXIST")[0])
+            self.email.errors.append("Invalid username or password")
             # Reduce timing variation between existing and non-existing users
             hash_password(self.password.data)
             return False
@@ -464,7 +464,7 @@ class LoginForm(Form, NextFormMixin):
             return False
         self.password.data = _security._password_util.normalize(self.password.data)
         if not self.user.verify_and_update_password(self.password.data):
-            self.password.errors.append(get_message("INVALID_PASSWORD")[0])
+            self.email.errors.append("Invalid username or password")
             return False
         self.requires_confirmation = requires_confirmation(self.user)
         if self.requires_confirmation:
