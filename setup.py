@@ -14,6 +14,7 @@ install_requires = [
     "Flask-Login>=0.4.1",
     "Flask-Principal>=0.4.0",
     "Flask-WTF>=0.14.3",
+    "Flask-Mailman",
     "email-validator>=1.1.1",
     "itsdangerous>=1.1.0",
     "passlib>=1.7.2",
