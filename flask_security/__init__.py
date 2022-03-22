@@ -21,11 +21,6 @@ from .core import (
     current_user,
 )
 from .datastore import (
-    UserDatastore,
-    SQLAlchemyUserDatastore,
-    MongoEngineUserDatastore,
-    PeeweeUserDatastore,
-    PonyUserDatastore,
     SQLAlchemySessionUserDatastore,
 )
 from .decorators import (
