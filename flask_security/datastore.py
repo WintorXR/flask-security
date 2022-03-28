@@ -15,15 +15,23 @@ import datetime
 import typing as t
 import uuid
 
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
+from sqlalchemy.future import select
+
 
 class SQLAlchemySessionUserDatastore:
     """
     Data store for users. We can also do without when more and more stuff from flask security is being removed.
-    """
+    """        
+  
     def __init__(self, session: "sqlalchemy.orm.scoping.scoped_session", user_model: "User", role_model: "Role"):
         self.session = session
         self.user_model = user_model
         self.role_model = role_model
+        
+    def commit(self):
+        self.session.commit()
 
     def find_role(self, role: str) -> t.Union["Role", None]:
         """
@@ -34,7 +42,6 @@ class SQLAlchemySessionUserDatastore:
         Returns:
             Role: object
         """
-        from sqlalchemy.future import select
         return self.session.scalars(select(self.role_model).filter_by(name=role)).first()  # type: ignore
 
     def find_user(self, case_insensitive: bool = False, **kwargs: t.Any) -> t.Union["User", None]:
@@ -47,13 +54,9 @@ class SQLAlchemySessionUserDatastore:
         Returns:
             User: object
         """
-        from sqlalchemy.future import select
-        from sqlalchemy import func
-
+ 
         query = select(self.user_model)
         if hasattr(self.user_model, "roles"):
-            from sqlalchemy.orm import joinedload
-
             query = query.options(joinedload(self.user_model.roles))
 
         if case_insensitive:
@@ -108,7 +111,7 @@ class SQLAlchemySessionUserDatastore:
         """
         kwargs = self._prepare_create_user_args(**kwargs)
         self.session.add(user := self.user_model(**kwargs))
-        self.session.commit()
+        self.commit()
         return user
 
     def create_role(self, **kwargs: t.Any) -> "Role":
@@ -122,14 +125,12 @@ class SQLAlchemySessionUserDatastore:
             @permissions_required()
 
             .. versionadded:: 3.3.0
-
         """
         if "permissions" in kwargs and hasattr(self.role_model, "permissions"):
             perms = kwargs["permissions"]
             if isinstance(perms, list) or isinstance(perms, set):
                 perms = ",".join(perms)
             elif isinstance(perms, str):
-                # squash spaces.
                 perms = ",".join(p.strip() for p in perms.split(","))
             kwargs["permissions"] = perms
 
@@ -153,11 +154,10 @@ class SQLAlchemySessionUserDatastore:
 
         .. versionadded:: 4.0.0
         """
-        if not uniquifier:
-            uniquifier = uuid.uuid4().hex
+        uniquifier = uniquifier if uniquifier else uuid.uuid4().hex
         if hasattr(user, "fs_token_uniquifier"):
             user.fs_token_uniquifier = uniquifier
-            self.session.commit()
+            self.commit()
 
     def set_uniquifier(self, user: "User", uniquifier: t.Union[str, None] = None) -> None:
         """Set user's Flask-Security identity key.
@@ -169,10 +169,8 @@ class SQLAlchemySessionUserDatastore:
 
         .. versionadded:: 3.3.0
         """
-        if not uniquifier:
-            uniquifier = uuid.uuid4().hex
-        user.fs_uniquifier = uniquifier
-        self.session.commit()
+        user.fs_uniquifier = uniquifier if uniquifier else uuid.uuid4().hex
+        self.commit()
 
     def activate_user(self, user: "User") -> bool:
         """Activates a specified user. Returns `True` if a change was made.
@@ -181,9 +179,8 @@ class SQLAlchemySessionUserDatastore:
         """
         if not user.active:
             user.active = True
-            self.session.commit()
-            return True
-        return False
+            self.commit()
+        return user.active
 
     def deactivate_user(self, user: "User") -> bool:
         """Deactivates a specified user. Returns `True` if a change was made.
@@ -196,14 +193,13 @@ class SQLAlchemySessionUserDatastore:
         """
         if user.active:
             user.active = False
-            self.session.commit()
-            return True
-        return False
+            self.commit()
+        return not user.active
 
     def toggle_active(self, user: "User") -> bool:
         """Toggles a user's active status. Always returns True."""
         user.active = not user.active
-        self.session.commit()
+        self.commit()
         return True
 
     def remove_permissions_from_role(self, role: t.Union["Role", str], permissions: t.Union[set, list, str]) -> bool:
@@ -218,14 +214,10 @@ class SQLAlchemySessionUserDatastore:
 
         .. versionadded:: 4.0.0
         """
-
-        rv = False
-        role_obj = self._prepare_role_modify_args(role)
-        if role_obj:
-            rv = True
+        if (role_obj := self._prepare_role_modify_args(role)):
             role_obj.remove_permissions(permissions)
-            self.session.commit()
-        return rv
+            self.commit()
+        return bool(role_obj)
 
     def add_permissions_to_role(self, role: t.Union["Role", str], permissions: t.Union[set, list, str]) -> bool:
         """Add one or more permissions to role.
@@ -239,14 +231,11 @@ class SQLAlchemySessionUserDatastore:
 
         .. versionadded:: 4.0.0
         """
-
-        rv = False
-        role_obj = self._prepare_role_modify_args(role)
-        if role_obj:
-            rv = True
+        
+        if (role_obj := self._prepare_role_modify_args(role)):
             role_obj.add_permissions(permissions)
-            self.session.commit()
-        return rv
+            self.commit()
+        return bool(role_obj)
 
     def remove_role_from_user(self, user: "User", role: t.Union["Role", str]) -> bool:
         """Removes a role from a user.
@@ -257,13 +246,10 @@ class SQLAlchemySessionUserDatastore:
         :return: True if role was removed, False if role doesn't exist or user didn't
             have role.
         """
-        rv = False
-        role_obj = self._prepare_role_modify_args(role)
-        if role_obj in user.roles:
-            rv = True
+        if (role_obj := self._prepare_role_modify_args(role)) in user.roles:
             user.roles.remove(role_obj)
-            self.session.commit()
-        return rv
+            self.commit()
+        return bool(role_obj)
 
     def add_role_to_user(self, user: "User", role: t.Union["Role", str]) -> bool:
         """Adds a role to a user.
@@ -273,14 +259,13 @@ class SQLAlchemySessionUserDatastore:
             string role name
         :return: True is role was added, False if role already existed.
         """
-        role_obj = self._prepare_role_modify_args(role)
-        if not role_obj:
+        
+        if not (role_obj := self._prepare_role_modify_args(role)):
             raise ValueError(f"Role: {role} doesn't exist")
         if role_obj not in user.roles:
             user.roles.append(role_obj)
-            self.session.commit()
-            return True
-        return False
+            self.commit()
+        return bool(role_obj)
 
 
 if t.TYPE_CHECKING:  # pragma: no cover
