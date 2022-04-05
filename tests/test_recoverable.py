@@ -47,13 +47,12 @@ def test_recoverable_flag(app, clients, get_message):
 
     # Test submitting email to reset password creates a token and sends email
     with capture_reset_password_requests() as requests:
-        with app.mail.record_messages() as outbox:
-            response = clients.post(
-                "/reset", data=dict(email="joe@lp.com"), follow_redirects=True
-            )
+        response = clients.post(
+            "/reset", data=dict(email="joe@lp.com"), follow_redirects=True
+        )
 
     assert len(recorded_instructions_sent) == 1
-    assert len(outbox) == 1
+    assert len(app.mail.outbox) == 1
     assert response.status_code == 200
     assert get_message("PASSWORD_RESET_REQUEST", email="joe@lp.com") in response.data
     token = requests[0]["token"]
@@ -149,16 +148,15 @@ def test_recoverable_json(app, client, get_message):
     with capture_flashes() as flashes:
         # Test reset password creates a token and sends email
         with capture_reset_password_requests() as requests:
-            with app.mail.record_messages() as outbox:
-                response = client.post(
-                    "/reset",
-                    json=dict(email="joe@lp.com"),
-                    headers={"Content-Type": "application/json"},
-                )
-                assert response.headers["Content-Type"] == "application/json"
+            response = client.post(
+                "/reset",
+                json=dict(email="joe@lp.com"),
+                headers={"Content-Type": "application/json"},
+            )
+            assert response.headers["Content-Type"] == "application/json"
 
         assert len(recorded_instructions_sent) == 1
-        assert len(outbox) == 1
+        assert len(app.mail.outbox) == 1
         assert response.status_code == 200
         token = requests[0]["token"]
 
@@ -238,10 +236,10 @@ def test_recoverable_template(app, client, get_message):
     # in order to check all context vars since the default template
     # doesn't have all of them.
     with capture_reset_password_requests() as resets:
-        with app.mail.record_messages() as outbox:
-            response = client.post(
-                "/reset", data=dict(email="joe@lp.com"), follow_redirects=True
-            )
+        response = client.post(
+            "/reset", data=dict(email="joe@lp.com"), follow_redirects=True
+        )
+        outbox = app.mail.outbox
         assert len(outbox) == 1
         matcher = re.findall(r"\w+:.*", outbox[0].body, re.IGNORECASE)
         # should be 4 - link, email, token, config item
@@ -289,7 +287,7 @@ def test_recover_invalidates_session(app, client):
     # try to access protected endpoint with old session - shouldn't work
     response = other_client.get("/profile")
     assert response.status_code == 302
-    assert response.headers["Location"] == "http://localhost/login?next=%2Fprofile"
+    assert "/login?next=%2Fprofile" in response.location
 
 
 def test_login_form_description(sqlalchemy_app):

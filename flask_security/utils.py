@@ -712,12 +712,6 @@ def send_mail(subject, recipient, template, **context):
     if isinstance(sender, LocalProxy):
         sender = sender._get_current_object()
 
-    # In Flask-Mail, sender can be a two element tuple -- (name, address)
-    if isinstance(sender, tuple) and len(sender) == 2:
-        sender = (str(sender[0]), str(sender[1]))
-    else:
-        sender = str(sender)
-
     _security._mail_util.send_mail(
         template, subject, recipient, sender, body, html, context.get("user", None)
     )
@@ -1180,8 +1174,7 @@ def password_complexity_validator(
             if kwargs:
                 user_info = list(kwargs.values())
         results = zxcvbn.zxcvbn(password, user_inputs=user_info)
-        if results["score"] > 2:
-            # Good or Strong
+        if results["score"] >= config_value("ZXCVBN_MINIMUM_SCORE"):
             return None
         # Should we return suggestions? Default forms don't really know what to do.
         if results["feedback"]["warning"]:
