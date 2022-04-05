@@ -448,15 +448,17 @@ def test_no_email_sender(app, sqlalchemy_datastore):
     with app.app_context():
         app.try_trigger_before_first_request_functions()
         user = TestUser("matt@lp.com")
-        with app.mail.record_messages() as outbox:
-            send_mail("Test Default Sender", user.email, "welcome", user=user)
-            assert 1 == len(outbox)
-            assert "test@testme.com" == outbox[0].sender
+        send_mail("Test Default Sender", user.email, "welcome", user=user)
+        outbox = app.mail.outbox
+        assert 1 == len(outbox)
+        assert "test@testme.com" == outbox[0].from_email
 
 
 def test_sender_tuple(app, sqlalchemy_datastore):
     """Verify that if sender is a (name, address) tuple,
     in the received email sender is properly formatted as "name <address>"
+    Flask-Mail takes tuples - Flask-Mailman takes them - however the
+    local-mem backend doesn't format them correctly (SMTP backend doesn't work either?)
     """
     app.config["MAIL_DEFAULT_SENDER"] = ("Test User", "test@testme.com")
 
@@ -470,10 +472,10 @@ def test_sender_tuple(app, sqlalchemy_datastore):
     with app.app_context():
         app.try_trigger_before_first_request_functions()
         user = TestUser("matt@lp.com")
-        with app.mail.record_messages() as outbox:
-            send_mail("Test Tuple Sender", user.email, "welcome", user=user)
-            assert 1 == len(outbox)
-            assert "Test User <test@testme.com>" == outbox[0].sender
+        send_mail("Test Tuple Sender", user.email, "welcome", user=user)
+        outbox = app.mail.outbox
+        assert 1 == len(outbox)
+        assert outbox[0].from_email == "Test User <test@testme.com>"
 
 
 @pytest.mark.babel()
@@ -818,8 +820,7 @@ def test_authn_freshness(
         response = client.get("/myspecialview", follow_redirects=False)
         assert response.status_code == 302
         assert (
-            response.location
-            == "http://localhost/verify?next=http%3A%2F%2Flocalhost%2Fmyspecialview"
+            "/verify?next=http%3A%2F%2Flocalhost%2Fmyspecialview" in response.location
         )
     assert flashes[0]["category"] == "error"
     assert flashes[0]["message"].encode("utf-8") == get_message(
@@ -900,10 +901,7 @@ def test_default_authn_bp(app, client):
     reset_fresh(client, within=timedelta(minutes=1))
     response = client.get("/myview", follow_redirects=False)
     assert response.status_code == 302
-    assert (
-        response.location
-        == "http://localhost/myprefix/verify?next=http%3A%2F%2Flocalhost%2Fmyview"
-    )
+    assert "/myprefix/verify?next=http%3A%2F%2Flocalhost%2Fmyview" in response.location
 
 
 def test_authn_freshness_grace(app, client, get_message):
@@ -945,10 +943,7 @@ def test_authn_freshness_nc(app, client_nc, get_message):
     # This should fail - should be a redirect
     response = client_nc.get("/myview", headers=h, follow_redirects=False)
     assert response.status_code == 302
-    assert (
-        response.location
-        == "http://localhost/verify?next=http%3A%2F%2Flocalhost%2Fmyview"
-    )
+    assert "/verify?next=http%3A%2F%2Flocalhost%2Fmyview" in response.location
 
 
 def test_verify_fresh(app, client, get_message):
@@ -1143,11 +1138,11 @@ def test_post_security_with_application_root(app, sqlalchemy_datastore):
         "/login", data=dict(email="matt@lp.com", password="password")
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "http://localhost/root"
+    assert "/root" in response.location
 
     response = client.get("/logout")
     assert response.status_code == 302
-    assert response.headers["Location"] == "http://localhost/root"
+    assert "/root" in response.location
 
 
 def test_post_security_with_application_root_and_views(app, sqlalchemy_datastore):
@@ -1166,11 +1161,11 @@ def test_post_security_with_application_root_and_views(app, sqlalchemy_datastore
         "/login", data=dict(email="matt@lp.com", password="password")
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "http://localhost/post_login"
+    assert "/post_login" in response.location
 
     response = client.get("/logout")
     assert response.status_code == 302
-    assert response.headers["Location"] == "http://localhost/post_logout"
+    assert "/post_logout" in response.location
 
 
 @pytest.mark.settings(redirect_validate_mode="regex")

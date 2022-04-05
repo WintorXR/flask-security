@@ -71,6 +71,10 @@ possible using Flask-SQLAlchemy and the built-in model mixins:
     # Generate a good salt using: secrets.SystemRandom().getrandbits(128)
     app.config['SECURITY_PASSWORD_SALT'] = os.environ.get("SECURITY_PASSWORD_SALT", '146585145368132386173505678016728509634')
 
+    # have session and remember cookie be samesite (flask/flask_login)
+    app.config["REMEMBER_COOKIE_SAMESITE"] = "strict"
+    app.config["SESSION_COOKIE_SAMESITE"] = "strict"
+
     # Use an in-memory db
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
     # As of Flask-SQLAlchemy 2.4.0 it is easy to pass in options directly to the
@@ -422,27 +426,27 @@ Mail Configuration
 
 Flask-Security integrates with an outgoing mail service via the ``mail_util_cls`` which
 is part of initial configuration. The default class :class:`flask_security.MailUtil` utilizes the
-`Flask-Mail <https://pypi.org/project/Flask-Mail/>`_ package. Be sure to add flask_mail to
-your requirements.txt.
+`Flask-Mailman <https://pypi.org/project/flask-mailman/>`_ package. Be sure to add flask_mailman to
+your requirements.txt. The older and no longer maintained package `Flask-Mail <https://pypi.org/project/Flask-Mail/>`_
+is also (still) supported.
 
 The following code illustrates a basic setup, which could be added to
 the basic application code in the previous section::
 
     # At top of file
-    from flask_mail import Mail
+    from flask_mailman import Mail
 
     # After 'Create app'
     app.config['MAIL_SERVER'] = 'smtp.example.com'
-    app.config['MAIL_PORT'] = 465
-    app.config['MAIL_USE_SSL'] = False
+    app.config['MAIL_PORT'] = 587
     app.config['MAIL_USE_TLS'] = True
     app.config['MAIL_USERNAME'] = 'username'
     app.config['MAIL_PASSWORD'] = 'password'
     mail = Mail(app)
 
-To learn more about the various Flask-Mail settings to configure it to
+To learn more about the various Flask-Mailman settings to configure it to
 work with your particular email server configuration, please see the
-`Flask-Mail documentation <http://packages.python.org/Flask-Mail/>`_.
+`Flask-Mailman documentation <https://www.waynerv.com/flask-mailman/>`_.
 
 .. _proxy-configuration:
 

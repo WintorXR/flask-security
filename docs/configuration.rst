@@ -126,6 +126,15 @@ These configuration keys are used globally across all features.
     Default: ``None``
 
     .. versionadded:: 3.4.0
+.. py:data:: SECURITY_ZXCVBN_MINIMUM_SCORE
+
+    Required ``zxcvbn`` password complexity score (0-4).
+    Refer to https://github.com/dropbox/zxcvbn#usage for exact meanings of
+    different score values.
+
+    Default: ``3`` (Good or Strong)
+
+    .. versionadded:: 4.2.0
 .. py:data:: SECURITY_PASSWORD_CHECK_BREACHED
 
     If not ``None`` new/changed passwords will be checked against the
@@ -1097,6 +1106,7 @@ Configuration related to the two-factor authentication feature.
 .. py:data:: SECURITY_TWO_FACTOR_SELECT_TEMPLATE
 
     Specifies the path to the template for the select method page for the two-factor authentication process.
+    This is used when more than one two-factor method has been setup (e.g. SMS and Webauthn).
 
     Default: ``security/two_factor_select.html``.
 
@@ -1277,6 +1287,8 @@ Additional relevant configuration variables:
 
 Passwordless
 -------------
+
+This feature is DEPRECATED as of 4.2.0. Please use unified signin feature instead.
 
 .. py:data:: SECURITY_PASSWORDLESS
 
@@ -1481,9 +1493,10 @@ A list of all URLs and Views:
 * ``SECURITY_RESET_URL``
 * ``SECURITY_CHANGE_URL``
 * ``SECURITY_CONFIRM_URL``
-* ``SECURITY_TWO_FACTOR_SETUP_URL``
-* ``SECURITY_TWO_FACTOR_TOKEN_VALIDATION_URL``
-* ``SECURITY_TWO_FACTOR_RESCUE_URL``
+* :py:data:`SECURITY_TWO_FACTOR_SELECT_URL`
+* :py:data:`SECURITY_TWO_FACTOR_SETUP_URL`
+* :py:data:`SECURITY_TWO_FACTOR_TOKEN_VALIDATION_URL`
+* :py:data:`SECURITY_TWO_FACTOR_RESCUE_URL`
 * ``SECURITY_POST_LOGIN_VIEW``
 * ``SECURITY_POST_LOGOUT_VIEW``
 * ``SECURITY_CONFIRM_ERROR_VIEW``
@@ -1511,16 +1524,17 @@ Template Paths
 --------------
 A list of all templates:
 
-* ``SECURITY_FORGOT_PASSWORD_TEMPLATE``
-* ``SECURITY_LOGIN_USER_TEMPLATE``
+* :py:data:`SECURITY_FORGOT_PASSWORD_TEMPLATE`
+* :py:data:`SECURITY_LOGIN_USER_TEMPLATE`
 * :py:data:`SECURITY_VERIFY_TEMPLATE`
-* ``SECURITY_REGISTER_USER_TEMPLATE``
-* ``SECURITY_RESET_PASSWORD_TEMPLATE``
-* ``SECURITY_CHANGE_PASSWORD_TEMPLATE``
-* ``SECURITY_SEND_CONFIRMATION_TEMPLATE``
-* ``SECURITY_SEND_LOGIN_TEMPLATE``
-* ``SECURITY_TWO_FACTOR_VERIFY_CODE_TEMPLATE``
-* ``SECURITY_TWO_FACTOR_SETUP_TEMPLATE``
+* :py:data:`SECURITY_REGISTER_USER_TEMPLATE`
+* :py:data:`SECURITY_RESET_PASSWORD_TEMPLATE`
+* :py:data:`SECURITY_CHANGE_PASSWORD_TEMPLATE`
+* :py:data:`SECURITY_SEND_CONFIRMATION_TEMPLATE`
+* :py:data:`SECURITY_SEND_LOGIN_TEMPLATE`
+* :py:data:`SECURITY_TWO_FACTOR_VERIFY_CODE_TEMPLATE`
+* :py:data:`SECURITY_TWO_FACTOR_SELECT_TEMPLATE`
+* :py:data:`SECURITY_TWO_FACTOR_SETUP_TEMPLATE`
 * :py:data:`SECURITY_US_SIGNIN_TEMPLATE`
 * :py:data:`SECURITY_US_SETUP_TEMPLATE`
 * :py:data:`SECURITY_US_VERIFY_TEMPLATE`

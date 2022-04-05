@@ -26,7 +26,6 @@ from tests.test_utils import (
     authenticate,
     capture_flashes,
     get_existing_session,
-    get_session,
     json_authenticate,
     logout,
     reset_fresh,
@@ -271,10 +270,12 @@ def _signin_start(
     return signin_options, response_url
 
 
-def _signin_start_json(client, identity=None):
+def _signin_start_json(client, identity=None, remember=False):
     headers = {"Accept": "application/json", "Content-Type": "application/json"}
 
-    response = client.post("wan-signin", headers=headers, json=dict(identity=identity))
+    response = client.post(
+        "wan-signin", headers=headers, json=dict(identity=identity, remember=remember)
+    )
     signin_options = response.json["response"]["credential_options"]
     response_url = f'wan-signin/{response.json["response"]["wan_state"]}'
     return signin_options, response_url
@@ -558,7 +559,7 @@ def test_bad_data_register(app, client, get_message):
             follow_redirects=False,
         )
         assert response.status_code == 302
-        assert response.location == "http://localhost/wan-register"
+        assert "/wan-register" in response.location
     assert flashes[0]["category"] == "error"
     assert flashes[0]["message"].encode("utf-8") == get_message(
         "WEBAUTHN_NO_VERIFY", cause="id and raw_id were not equivalent"
@@ -746,7 +747,7 @@ def test_unk_credid(app, client, get_message):
             follow_redirects=False,
         )
         assert response.status_code == 302
-        assert response.location == "http://localhost/wan-signin"
+        assert "/wan-signin" in response.location
     assert flashes[0]["category"] == "error"
     assert flashes[0]["message"].encode("utf-8") == get_message(
         "WEBAUTHN_UNKNOWN_CREDENTIAL_ID"
@@ -793,7 +794,7 @@ def test_tf(app, client, get_message):
 
     # verify NOT logged in
     response = client.get("/profile", follow_redirects=False)
-    assert "localhost/login" in response.location
+    assert "/login" in response.location
 
     signin_options, response_url = _signin_start(client, "matt@lp.com")
     assert len(signin_options["allowCredentials"]) == 1
@@ -867,8 +868,8 @@ def test_tf_validity_window(app, client, get_message):
         follow_redirects=True,
     )
     assert b"Use Your WebAuthn Security Key as a Second Factor" in response.data
-    session = get_session(response)
-    assert "tf_user_id" in session
+    with client.session_transaction() as session:
+        assert "tf_user_id" in session
 
     signin_options, response_url = _signin_start(client, "matt@lp.com")
     response = client.post(response_url, json=dict(credential=json.dumps(SIGNIN_DATA1)))
@@ -1005,7 +1006,7 @@ def test_bad_token(app, client, get_message):
     response = client.post(
         "/wan-register/not a token", data=dict(), follow_redirects=False
     )
-    assert response.location == "http://localhost/wan-register"
+    assert "/wan-register" in response.location
 
     # Test wan-verify
     response = client.post("/wan-verify/not a token", json=dict())
@@ -1021,7 +1022,7 @@ def test_bad_token(app, client, get_message):
     response = client.post(
         "/wan-verify/not a token", data=dict(), follow_redirects=False
     )
-    assert response.location == "http://localhost/wan-verify"
+    assert "/wan-verify" in response.location
 
     # Test signin
     logout(client)
@@ -1039,7 +1040,7 @@ def test_bad_token(app, client, get_message):
     response = client.post(
         "/wan-signin/not a token", data=dict(), follow_redirects=False
     )
-    assert response.location == "http://localhost/wan-signin"
+    assert "/wan-signin" in response.location
 
 
 @pytest.mark.settings(
@@ -1307,8 +1308,7 @@ def test_verify(app, client, get_message):
 
     old_paa = reset_fresh(client, app.config["SECURITY_FRESHNESS"])
     response = client.get("fresh")
-    verify_url = response.location
-    assert verify_url == "http://localhost/verify?next=http%3A%2F%2Flocalhost%2Ffresh"
+    assert "/verify?next=http%3A%2F%2Flocalhost%2Ffresh" in response.location
     signin_options, response_url = _signin_start(
         client, endpoint="wan-verify?next=/fresh"
     )
@@ -1318,7 +1318,7 @@ def test_verify(app, client, get_message):
         data=dict(credential=json.dumps(SIGNIN_DATA1)),
         follow_redirects=False,
     )
-    assert response.location == "http://localhost/fresh"
+    assert "/fresh" in response.location
     with client.session_transaction() as sess:
         assert sess["fs_paa"] > old_paa
 
@@ -1366,7 +1366,7 @@ def test_verify_validate_error(app, client, get_message):
             follow_redirects=False,
         )
         assert response.status_code == 302
-        assert response.location == "http://localhost/wan-verify"
+        assert "/wan-verify" in response.location
     assert flashes[0]["category"] == "error"
     assert flashes[0]["message"].encode("utf-8") == get_message(
         "WEBAUTHN_UNKNOWN_CREDENTIAL_ID"
@@ -1465,3 +1465,69 @@ def test_verify_usage_secondary_json(app, client, get_message):
         response_url, json=dict(credential=json.dumps(keys["secondary"]["signin"]))
     )
     assert response.status_code == 200
+
+
+@pytest.mark.settings(webauthn_util_cls=HackWebauthnUtil)
+def test_remember_token(client):
+    # test that remember token properly set on primary authn with webauthn
+    authenticate(client)
+    register_options, response_url = _register_start_json(
+        client, name="testr3", usage="first"
+    )
+    response = client.post(response_url, json=dict(credential=json.dumps(REG_DATA1)))
+    assert response.status_code == 200
+    logout(client)
+
+    assert "remember_token" not in [c.name for c in client.cookie_jar]
+
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+
+    response = client.post(
+        "wan-signin", headers=headers, json=dict(identity="matt@lp.com", remember=True)
+    )
+    response_url = f'wan-signin/{response.json["response"]["wan_state"]}'
+    assert response.json["response"]["remember"]
+
+    response = client.post(
+        response_url,
+        json=dict(credential=json.dumps(SIGNIN_DATA1), remember=True),
+    )
+    assert "remember_token" in [c.name for c in client.cookie_jar]
+    client.cookie_jar.clear_session_cookies()
+    response = client.get("/profile")
+    assert b"profile" in response.data
+
+
+@pytest.mark.two_factor()
+@pytest.mark.unified_signin()
+@pytest.mark.settings(webauthn_util_cls=HackWebauthnUtil)
+def test_remember_token_tf(client):
+    # test that remember token properly set after secondary authn with webauthn
+    authenticate(client)
+    register_options, response_url = _register_start_json(client, name="testr3")
+    response = client.post(response_url, json=dict(credential=json.dumps(REG_DATA1)))
+    assert response.status_code == 200
+    logout(client)
+
+    assert "remember_token" not in [c.name for c in client.cookie_jar]
+
+    # login again - should require MFA
+    response = client.post(
+        "/us-signin",
+        json=dict(identity="matt@lp.com", passcode="password", remember=True),
+    )
+    assert response.status_code == 200
+    assert response.json["response"]["tf_method"] == "webauthn"
+    assert response.json["response"]["tf_required"]
+    with client.session_transaction() as session:
+        assert session["tf_remember_login"]
+
+    signin_options, response_url = _signin_start_json(client, "matt@lp.com")
+    response = client.post(
+        response_url,
+        json=dict(credential=json.dumps(SIGNIN_DATA1), remember=True),
+    )
+    assert "remember_token" in [c.name for c in client.cookie_jar]
+    client.cookie_jar.clear_session_cookies()
+    response = client.get("/profile")
+    assert b"profile" in response.data

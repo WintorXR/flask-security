@@ -100,22 +100,22 @@ def test_changeable_flag(app, client, get_message):
     assert get_message("PASSWORD_IS_THE_SAME") in response.data
 
     # Test successful submit sends email notification
-    with app.mail.record_messages() as outbox:
-        response = client.post(
-            "/change",
-            data={
-                "password": "password",
-                "new_password": "new strong password",
-                "new_password_confirm": "new strong password",
-            },
-            follow_redirects=True,
-        )
+    response = client.post(
+        "/change",
+        data={
+            "password": "password",
+            "new_password": "new strong password",
+            "new_password_confirm": "new strong password",
+        },
+        follow_redirects=True,
+    )
+    outbox = app.mail.outbox
 
     assert get_message("PASSWORD_CHANGE") in response.data
     assert b"Home Page" in response.data
     assert len(recorded) == 1
     assert len(outbox) == 1
-    assert "Your password has been changed" in outbox[0].html
+    assert "Your password has been changed" in outbox[0].body
 
     # Test leading & trailing whitespace not stripped
     response = client.post(
@@ -193,7 +193,7 @@ def test_change_invalidates_session(app, client):
     # try to access protected endpoint - shouldn't work
     response = client.get("/profile")
     assert response.status_code == 302
-    assert response.headers["Location"] == "http://localhost/login?next=%2Fprofile"
+    assert "/login?next=%2Fprofile" in response.location
 
 
 def test_change_updates_remember(app, client):
@@ -243,7 +243,7 @@ def test_change_invalidates_auth_token(app, client):
     # authtoken should now be invalid
     response = client.get("/token", headers=headers)
     assert response.status_code == 302
-    assert response.headers["Location"] == "http://localhost/login?next=%2Ftoken"
+    assert "/login?next=%2Ftoken" in response.location
 
 
 def test_auth_uniquifier(app):
@@ -322,16 +322,16 @@ def test_xlation(app, client, get_message_local):
         submit = localize_callback(_default_field_labels["change_password"])
         assert f'value="{submit}"'.encode() in response.data
 
-    with app.mail.record_messages() as outbox:
-        response = client.post(
-            "/change",
-            data={
-                "password": "password",
-                "new_password": "new strong password",
-                "new_password_confirm": "new strong password",
-            },
-            follow_redirects=True,
-        )
+    response = client.post(
+        "/change",
+        data={
+            "password": "password",
+            "new_password": "new strong password",
+            "new_password_confirm": "new strong password",
+        },
+        follow_redirects=True,
+    )
+    outbox = app.mail.outbox
 
     with app.test_request_context():
         assert get_message_local("PASSWORD_CHANGE").encode("utf-8") in response.data
@@ -345,7 +345,7 @@ def test_xlation(app, client, get_message_local):
         )
         assert (
             str(markupsafe.escape(localize_callback("Your password has been changed.")))
-            in outbox[0].html
+            in outbox[0].alternatives[0][0]
         )
         assert localize_callback("Your password has been changed") in outbox[0].body
 
@@ -366,17 +366,16 @@ def test_custom_change_template(client):
 
 @pytest.mark.settings(send_password_change_email=False)
 def test_disable_change_emails(app, client):
-    with app.mail.record_messages() as outbox:
-        client.post(
-            "/change",
-            data={
-                "password": "password",
-                "new_password": "newpassword",
-                "new_password_confirm": "newpassword",
-            },
-            follow_redirects=True,
-        )
-    assert len(outbox) == 0
+    client.post(
+        "/change",
+        data={
+            "password": "password",
+            "new_password": "newpassword",
+            "new_password_confirm": "newpassword",
+        },
+        follow_redirects=True,
+    )
+    assert not app.mail.outbox
 
 
 @pytest.mark.settings(post_change_view="/profile")
@@ -440,8 +439,7 @@ def test_basic_change(app, client_nc, get_message):
     assert b"Home Page" in response.data
 
 
-@pytest.mark.settings(password_complexity_checker="zxcvbn")
-def test_easy_password(app, client):
+def __test_easy_password(client):
     authenticate(client)
 
     data = (
@@ -453,9 +451,21 @@ def test_easy_password(app, client):
         "/change", data=data, headers={"Content-Type": "application/json"}
     )
     assert response.headers["Content-Type"] == "application/json"
+    return response
+
+
+@pytest.mark.settings(password_complexity_checker="zxcvbn")
+def test_easy_password(app, client):
+    response = __test_easy_password(client)
     assert response.status_code == 400
     # Response from zxcvbn
     assert "Repeats like" in response.json["response"]["errors"]["new_password"][0]
+
+
+@pytest.mark.settings(password_complexity_checker="zxcvbn", zxcvbn_minimum_score=0)
+def test_easy_password_ok(app, client):
+    response = __test_easy_password(client)
+    assert response.status_code == 200
 
 
 def test_my_validator(app, sqlalchemy_datastore):
