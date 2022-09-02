@@ -397,6 +397,11 @@ def auth_required(
                 return _security._unauthorized_callback()
             else:
                 return _security._unauthn_handler(ams, headers=h)
+            
+        if decorated_view.__doc__ is None:
+            decorated_view.__doc__ = ""
+
+        decorated_view.__doc__ += "This endpoint requires authentication.\n"
 
         return decorated_view
 
@@ -485,6 +490,11 @@ def roles_required(*roles: str) -> DecoratedView:
                         return _security._unauthorized_callback()
                     return _security._unauthz_handler(roles_required, list(roles))
             return fn(*args, **kwargs)
+        
+        if decorated_view.__doc__ is None:
+            decorated_view.__doc__ = ""
+
+        decorated_view.__doc__ += f"This enpoint requires the roles {roles.join(',')}\n"
 
         return decorated_view
 
