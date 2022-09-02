@@ -494,7 +494,7 @@ def roles_required(*roles: str) -> DecoratedView:
         if decorated_view.__doc__ is None:
             decorated_view.__doc__ = ""
 
-        decorated_view.__doc__ += f"This enpoint requires the roles {roles.join(',')}\n"
+        decorated_view.__doc__ += f"This enpoint requires the roles {roles}\n"
 
         return decorated_view
 
