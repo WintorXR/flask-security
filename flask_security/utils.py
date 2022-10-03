@@ -1019,17 +1019,7 @@ def default_want_json(req):
 
     :param req: Flask/Werkzeug Request
     """
-    if req.is_json:
-        return True
-    # TODO should this handle json sub-types?
-    accept_mimetypes = req.accept_mimetypes
-    if not hasattr(req.accept_mimetypes, "best"):  # pragma: no cover
-        # Alright. we dont have the best property, lets add it ourselves.
-        # This is for quart compatibility
-        accept_mimetypes.best = best
-    if accept_mimetypes.best == "application/json":
-        return True
-    return False
+    return True
 
 
 def json_error_response(errors):
