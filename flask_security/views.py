@@ -1040,8 +1040,6 @@ def create_blueprint(app, state, import_name, json_encoder=None):
         subdomain=state.subdomain,
         template_folder="templates",
     )
-    if json_encoder:
-        bp.json_encoder = json_encoder
 
     if state.logout_methods is not None:
         bp.route(state.logout_url, methods=state.logout_methods, endpoint="logout")(
