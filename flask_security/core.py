@@ -18,7 +18,7 @@ import typing as t
 import warnings
 
 import pkg_resources
-from flask import _request_ctx_stack, current_app
+from flask import g, current_app
 from flask.json import JSONEncoder
 from flask_login import AnonymousUserMixin, LoginManager
 from flask_login import UserMixin as BaseUserMixin
@@ -558,9 +558,9 @@ def _request_loader(request):
     # decorator @auth_token_required can call us.
     # N.B. we don't call current_user here since that in fact might try and LOAD
     # a user - which would call us again.
-    if all(hasattr(_request_ctx_stack.top, k) for k in ["fs_authn_via", "user"]):
-        if _request_ctx_stack.top.fs_authn_via == "token":
-            return _request_ctx_stack.top.user
+    if all(hasattr(g, k) for k in ["fs_authn_via", "user"]):
+        if g.fs_authn_via == "token":
+            return g.user
 
     header_key = _security.token_authentication_header
     args_key = _security.token_authentication_key
