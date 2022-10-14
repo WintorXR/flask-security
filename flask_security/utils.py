@@ -23,7 +23,7 @@ import urllib.request
 import urllib.error
 
 from flask import (
-    _request_ctx_stack,
+    g,
     after_this_request,
     current_app,
     flash,
@@ -83,11 +83,12 @@ def get_request_attr(name: str) -> t.Any:
 
     .. versionadded:: 4.0.0
     """
-    return getattr(_request_ctx_stack.top, name, None)
+    
+    return getattr(g, name, None)
 
 
 def set_request_attr(name, value):
-    return setattr(_request_ctx_stack.top, name, value)
+    return setattr(g, name, value)
 
 
 """
