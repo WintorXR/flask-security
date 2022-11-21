@@ -110,7 +110,11 @@ class SQLAlchemySessionUserDatastore:
             User: with data
         """
         kwargs = self._prepare_create_user_args(**kwargs)
+        password = kwargs.pop('password')
+        fs_uniquifier = kwargs.pop('fs_uniquifier')
         self.session.add(user := self.user_model(**kwargs))
+        user.password = password
+        user.fs_uniquifier = fs_uniquifier
         self.commit()
         return user
 
