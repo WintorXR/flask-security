@@ -426,9 +426,7 @@ class LoginForm(Form, NextFormMixin):
 
     # Note: "email" field is added at init_app time - depending on whether
     # username is enabled or not (EmailField versus StringField)
-    password = PasswordField(
-        get_form_field_label("password"), validators=[password_required]
-    )
+    password = PasswordField(get_form_field_label("password"))
     remember = BooleanField(get_form_field_label("remember_me"))
     submit = SubmitField(get_form_field_label("login"))
 
@@ -462,7 +460,7 @@ class LoginForm(Form, NextFormMixin):
         if self.user is None:
             self.email.errors.append("Invalid username or password")
             # Reduce timing variation between existing and non-existing users
-            hash_password(self.password.data)
+            hash_password("not a password")
             return False
         if not self.user.is_active and not self.user.deactivated_since:
             self.email.errors.append("Account not yet activated")
