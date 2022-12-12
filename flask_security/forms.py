@@ -464,6 +464,12 @@ class LoginForm(Form, NextFormMixin):
             # Reduce timing variation between existing and non-existing users
             hash_password(self.password.data)
             return False
+        if not self.user.is_active and not self.user.deactivated_since:
+            self.email.errors.append("Account not yet activated")
+            return False
+        if not self.user.is_active:
+            self.email.errors.append("Account deactivated")
+            return False
         if not self.user.password:
             self.password.errors.append(get_message("PASSWORD_NOT_SET")[0])
             # Reduce timing variation between existing and non-existing users
@@ -476,9 +482,6 @@ class LoginForm(Form, NextFormMixin):
         self.requires_confirmation = requires_confirmation(self.user)
         if self.requires_confirmation:
             self.email.errors.append(get_message("CONFIRMATION_REQUIRED")[0])
-            return False
-        if not self.user.is_active:
-            self.email.errors.append(get_message("DISABLED_ACCOUNT")[0])
             return False
         return True
 
